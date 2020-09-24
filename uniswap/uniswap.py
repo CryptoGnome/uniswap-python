@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 AddressLike = Union[Address, ChecksumAddress, ENS]
-
+gasApi = 'https://data-api.defipulse.com/api/v1/egs/api/ethgasAPI.json?api-key=13b59354060c3da9bddef67864a14cb68e95bf07da370a37782353b92957'
 
 class InvalidToken(Exception):
     def __init__(self, address: Any) -> None:
@@ -728,6 +728,7 @@ class Uniswap:
         self, function: ContractFunction, tx_params: Optional[TxParams] = None
     ) -> HexBytes:
         """Build and send a transaction."""
+        print("Building TX")
         if not tx_params:
             tx_params = self._get_tx_params()
         transaction = function.buildTransaction(tx_params)
@@ -739,14 +740,34 @@ class Uniswap:
         try:
             return self.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
         finally:
+            print("Print TX = ", self.w3.toHex(self.w3.keccak(signed_txn.rawTransaction)))
             logger.debug(f"nonce: {tx_params['nonce']}")
             self.last_nonce = Nonce(tx_params["nonce"] + 1)
 
     def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(250000)) -> TxParams:
         """Get generic transaction parameters."""
+        try:
+            print("Checking Ether Gas Station")
+            r = requests.get(url=gasApi)
+            gasData = r.json()
+            gas_price = int(gasData['fastest']/10) + 10
+            gasPrice = self.w3.toWei(gas_price, 'GWEI')
+            print("Current Gas Price =", gasPrice/1000000000)
+            print("Value Check", value)
+
+            #if gas_price > settings.gas_max:
+            #    return
+            #else:
+            #    pass
+
+        except KeyError:
+            print("Gas Station API Fail Try Again")
+            pass
+
         return {
             "from": _addr_to_str(self.address),
             "value": value,
+            'gasPrice': gasPrice,
             "gas": gas,
             "nonce": max(
                 self.last_nonce, self.w3.eth.getTransactionCount(self.address)
