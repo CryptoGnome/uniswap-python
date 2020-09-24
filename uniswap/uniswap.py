@@ -4,7 +4,7 @@ import time
 import logging
 import functools
 from typing import List, Any, Optional, Callable, Union, Tuple, Dict
-
+import requests
 from web3 import Web3
 from web3.eth import Contract
 from web3.contract import ContractFunction
