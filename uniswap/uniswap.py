@@ -750,15 +750,13 @@ class Uniswap:
             print("Checking Ether Gas Station")
             r = requests.get(url=gasApi)
             gasData = r.json()
-            gas_price = int(gasData['fastest']/10) + 10
-            gasPrice = self.w3.toWei(gas_price, 'GWEI')
+            gas_price = int(gasData['fastest']/10)
+            boost = (gas_price * 0.25) + gas_price
+            gas_boosted = gas_price + boost
+            gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
             print("Current Gas Price =", gasPrice/1000000000)
             print("Value Check", value)
 
-            #if gas_price > settings.gas_max:
-            #    return
-            #else:
-            #    pass
 
         except KeyError:
             print("Gas Station API Fail Try Again")
