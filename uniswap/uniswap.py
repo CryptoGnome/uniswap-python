@@ -751,11 +751,9 @@ class Uniswap:
             r = requests.get(url=gasApi)
             gasData = r.json()
             gas_price = int(gasData['fastest']/10)
-            boost = (gas_price * 0.05) + gas_price
-            gas_boosted = gas_price + boost
+            gas_boosted = (gas_price * 0.10) + gas_price
             gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
             print("Current Gas Price =", gasPrice/1000000000)
-            print("Value Check", value)
 
 
         except KeyError:
