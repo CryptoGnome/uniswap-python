@@ -766,7 +766,7 @@ class Uniswap:
     def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(500000)) -> TxParams:
         """Get generic transaction parameters."""
 
-        Uniswap.check_gas()
+        Uniswap.check_gas(self)
 
         return {
             "from": _addr_to_str(self.address),
