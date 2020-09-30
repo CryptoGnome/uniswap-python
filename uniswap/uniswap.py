@@ -744,26 +744,34 @@ class Uniswap:
             logger.debug(f"nonce: {tx_params['nonce']}")
             self.last_nonce = Nonce(tx_params["nonce"] + 1)
 
-    def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(500000)) -> TxParams:
-        """Get generic transaction parameters."""
+    def check_gas(self):
         try:
             print("Checking Ether Gas Station")
             r = requests.get(url=gasApi)
             gasData = r.json()
             gas_price = int(gasData['fastest']/10)
             gas_boosted = (gas_price * 0.10) + gas_price
-            gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
-            print("Current Gas Price =", gasPrice/1000000000)
+            self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
+            print("Current Gas Price =", self.gasPrice/1000000000)
 
+        except Exception:
+            print("Checking Gas NOW")
+            r = requests.get('https://www.gasnow.org/api/v3/gas/price?utm_source=:LimitSwap').json()
+            gasData = r['data']
+            gas_price = int(gasData['rapid'] / 10)
+            gas_boosted = (gas_price * 0.10) + gas_price
+            self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
+            print("Current Gas Price =", self.gasPrice/1000000000)
 
-        except KeyError:
-            print("Gas Station API Fail Try Again")
-            pass
+    def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(500000)) -> TxParams:
+        """Get generic transaction parameters."""
+
+        Uniswap.check_gas()
 
         return {
             "from": _addr_to_str(self.address),
             "value": value,
-            'gasPrice': gasPrice,
+            'gasPrice': self.gasPrice,
             "gas": gas,
             "nonce": max(
                 self.last_nonce, self.w3.eth.getTransactionCount(self.address)
