@@ -743,7 +743,7 @@ class Uniswap:
             print("Print TX = ", self.w3.toHex(self.w3.keccak(signed_txn.rawTransaction)))
             logger.debug(f"nonce: {tx_params['nonce']}")
             self.last_nonce = Nonce(tx_params["nonce"] + 1)
-            self.w3.eth.waitForTransactionReceipt(signed_txn.rawTransaction, timeout=6000)
+
 
 
     def check_gas(self):
@@ -752,7 +752,7 @@ class Uniswap:
             r = requests.get('https://www.gasnow.org/api/v3/gas/price?utm_source=:LimitSwap').json()
             gasData = r['data']
             gas_price = int(gasData['rapid'] / 1000000000)
-            gas_boosted = (gas_price * 0.25) + gas_price
+            gas_boosted = (gas_price * 0.35) + gas_price
             self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
             print("Current Gas Price =", self.gasPrice/1000000000)
 
@@ -760,7 +760,7 @@ class Uniswap:
             print("API Error Estimating Gas Cost Using Web3")
             gas = self.w3.eth.gasPrice
             gas_price = gas / 1000000000
-            gas_boosted = (gas_price * 0.25) + gas_price
+            gas_boosted = (gas_price * 0.35) + gas_price
             self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
             print("Current Gas Price =", self.gasPrice/1000000000)
 
