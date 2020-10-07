@@ -731,18 +731,20 @@ class Uniswap:
         print("Building TX")
         if not tx_params:
             tx_params = self._get_tx_params()
-        transaction = function.buildTransaction(tx_params)
-        signed_txn = self.w3.eth.account.sign_transaction(
+            transaction = function.buildTransaction(tx_params)
+            signed_txn = self.w3.eth.account.sign_transaction(
             transaction, private_key=self.private_key
         )
         # TODO: This needs to get more complicated if we want to support replacing a transaction
         # FIXME: This does not play nice if transactions are sent from other places using the same wallet.
         try:
-            return self.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
+            return tx_hash = self.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
         finally:
-            print("Print TX = ", self.w3.toHex(self.w3.keccak(signed_txn.rawTransaction)))
+            print("Print TX = ", self.w3.toHex(self.w3.keccak(tx_hash)))
             logger.debug(f"nonce: {tx_params['nonce']}")
             self.last_nonce = Nonce(tx_params["nonce"] + 1)
+            self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=6000)
+
 
     def check_gas(self):
         try:
@@ -750,7 +752,7 @@ class Uniswap:
             r = requests.get('https://www.gasnow.org/api/v3/gas/price?utm_source=:LimitSwap').json()
             gasData = r['data']
             gas_price = int(gasData['rapid'] / 1000000000)
-            gas_boosted = (gas_price * 0.10) + gas_price
+            gas_boosted = (gas_price * 0.25) + gas_price
             self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
             print("Current Gas Price =", self.gasPrice/1000000000)
 
@@ -758,12 +760,12 @@ class Uniswap:
             print("API Error Estimating Gas Cost Using Web3")
             gas = self.w3.eth.gasPrice
             gas_price = gas / 1000000000
-            gas_boosted = (gas_price * 0.10) + gas_price
+            gas_boosted = (gas_price * 0.25) + gas_price
             self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
             print("Current Gas Price =", self.gasPrice/1000000000)
 
 
-    def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(500000)) -> TxParams:
+    def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(350000)) -> TxParams:
         """Get generic transaction parameters."""
 
         Uniswap.check_gas(self)
