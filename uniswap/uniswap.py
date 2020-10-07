@@ -738,12 +738,12 @@ class Uniswap:
         # TODO: This needs to get more complicated if we want to support replacing a transaction
         # FIXME: This does not play nice if transactions are sent from other places using the same wallet.
         try:
-            return tx_hash = self.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
+            return self.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
         finally:
-            print("Print TX = ", self.w3.toHex(self.w3.keccak(tx_hash)))
+            print("Print TX = ", self.w3.toHex(self.w3.keccak(signed_txn.rawTransaction)))
             logger.debug(f"nonce: {tx_params['nonce']}")
             self.last_nonce = Nonce(tx_params["nonce"] + 1)
-            self.w3.eth.waitForTransactionReceipt(tx_hash, timeout=6000)
+            self.w3.eth.waitForTransactionReceipt(signed_txn.rawTransaction, timeout=6000)
 
 
     def check_gas(self):
