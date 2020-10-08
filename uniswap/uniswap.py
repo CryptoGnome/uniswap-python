@@ -4,7 +4,7 @@ import time
 import logging
 import functools
 from typing import List, Any, Optional, Callable, Union, Tuple, Dict
-import requests
+
 from web3 import Web3
 from web3.eth import Contract
 from web3.contract import ContractFunction
@@ -17,14 +17,23 @@ from web3.types import (
     Nonce,
     HexBytes,
 )
+from eth_utils import is_same_address
+from eth_typing import AnyAddress
+import requests
+
 
 ETH_ADDRESS = "0x0000000000000000000000000000000000000000"
 
 logger = logging.getLogger(__name__)
 
+f = open('settings.json', )
+settings = json.load(f)[0]
+f.close()
 
+
+# TODO: Consider dropping support for ENS altogether and instead use AnyAddress
 AddressLike = Union[Address, ChecksumAddress, ENS]
-gasApi = 'https://data-api.defipulse.com/api/v1/egs/api/ethgasAPI.json?api-key=13b59354060c3da9bddef67864a14cb68e95bf07da370a37782353b92957'
+
 
 class InvalidToken(Exception):
     def __init__(self, address: Any) -> None:
@@ -126,7 +135,7 @@ class Uniswap:
         provider: str = None,
         web3: Web3 = None,
         version: int = 1,
-        max_slippage: float = 0.1,
+        max_slippage: float = (settings['SLIPPAGE']/100),
     ) -> None:
         self.address: AddressLike = _str_to_addr(address) if isinstance(
             address, str
@@ -263,9 +272,11 @@ class Uniswap:
     def erc20_contract(self, token_addr: AddressLike) -> Contract:
         return self._load_contract(abi_name="erc20", address=token_addr)
 
+    @functools.lru_cache()
     @supports([2])
-    def get_weth_address(self) -> Address:
-        address: Address = self.router.functions.WETH().call()
+    def get_weth_address(self) -> ChecksumAddress:
+        # Contract calls should always return checksummed addresses
+        address: ChecksumAddress = self.router.functions.WETH().call()
         return address
 
     def _load_contract(self, abi_name: str, address: AddressLike) -> Contract:
@@ -309,9 +320,16 @@ class Uniswap:
 
     @supports([2])
     def get_token_token_input_price(
-        self, token0: AddressLike, token1: AddressLike, qty: int
+        self, token0: AnyAddress, token1: AnyAddress, qty: int
     ) -> int:
         """Public price for token to token trades with an exact input."""
+        # If one of the tokens are WETH, delegate to appropriate call.
+        # See: https://github.com/shanefontaine/uniswap-python/issues/22
+        if is_same_address(token0, self.get_weth_address()):
+            return int(self.get_eth_token_input_price(token1, qty))
+        elif is_same_address(token1, self.get_weth_address()):
+            return int(self.get_token_eth_input_price(token0, qty))
+
         price: int = self.router.functions.getAmountsOut(
             qty, [token0, self.get_weth_address(), token1]
         ).call()[-1]
@@ -343,9 +361,17 @@ class Uniswap:
 
     @supports([2])
     def get_token_token_output_price(
-        self, token0: AddressLike, token1: AddressLike, qty: int
+        self, token0: AnyAddress, token1: AnyAddress, qty: int
     ) -> int:
         """Public price for token to token trades with an exact output."""
+        # If one of the tokens are WETH, delegate to appropriate call.
+        # See: https://github.com/shanefontaine/uniswap-python/issues/22
+        # TODO: Will these equality checks always work? (Address vs ChecksumAddress vs str)
+        if is_same_address(token0, self.get_weth_address()):
+            return int(self.get_eth_token_output_price(token1, qty))
+        elif is_same_address(token1, self.get_weth_address()):
+            return int(self.get_token_eth_output_price(token0, qty))
+
         price: int = self.router.functions.getAmountsIn(
             qty, [token0, self.get_weth_address(), token1]
         ).call()[0]
@@ -500,9 +526,8 @@ class Uniswap:
         """Convert tokens to ETH given an input amount."""
         # Balance check
         input_balance = self.get_token_balance(input_token)
-        cost = self.get_token_eth_input_price(input_token, qty)
-        if cost > input_balance:
-            raise InsufficientBalance(input_balance, cost)
+        if qty > input_balance:
+            raise InsufficientBalance(input_balance, qty)
 
         if self.version == 1:
             token_funcs = self.exchange_contract(input_token).functions
@@ -516,10 +541,14 @@ class Uniswap:
         else:
             if recipient is None:
                 recipient = self.address
+            amount_out_min = int(
+                (1 - self.max_slippage)
+                * self.get_token_eth_input_price(input_token, qty)
+            )
             return self._build_and_send_tx(
                 self.router.functions.swapExactTokensForETH(
                     qty,
-                    int((1 - self.max_slippage) * cost),
+                    amount_out_min,
                     [input_token, self.get_weth_address()],
                     recipient,
                     self._deadline(),
@@ -728,15 +757,12 @@ class Uniswap:
         self, function: ContractFunction, tx_params: Optional[TxParams] = None
     ) -> HexBytes:
         """Build and send a transaction."""
-        print("Building TX")
         if not tx_params:
             tx_params = self._get_tx_params()
         transaction = function.buildTransaction(tx_params)
         signed_txn = self.w3.eth.account.sign_transaction(
             transaction, private_key=self.private_key
         )
-        # TODO: This needs to get more complicated if we want to support replacing a transaction
-        # FIXME: This does not play nice if transactions are sent from other places using the same wallet.
         try:
             return self.w3.eth.sendRawTransaction(signed_txn.rawTransaction)
         finally:
@@ -744,15 +770,13 @@ class Uniswap:
             logger.debug(f"nonce: {tx_params['nonce']}")
             self.last_nonce = Nonce(tx_params["nonce"] + 1)
 
-
-
     def check_gas(self):
         try:
             print("Checking Gas NOW")
             r = requests.get('https://www.gasnow.org/api/v3/gas/price?utm_source=:LimitSwap').json()
             gasData = r['data']
             gas_price = int(gasData['rapid'] / 1000000000)
-            gas_boosted = (gas_price * 0.35) + gas_price
+            gas_boosted = (gas_price * (settings['GASBOOST']/100)) + gas_price
             self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
             print("Current Gas Price =", self.gasPrice/1000000000)
 
@@ -760,16 +784,15 @@ class Uniswap:
             print("API Error Estimating Gas Cost Using Web3")
             gas = self.w3.eth.gasPrice
             gas_price = gas / 1000000000
-            gas_boosted = (gas_price * 0.35) + gas_price
+            gas_boosted = (gas_price * ((settings['GASBOOST']*4)/100)) + gas_price
             self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
             print("Current Gas Price =", self.gasPrice/1000000000)
 
 
-    def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(350000)) -> TxParams:
+
+    def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(settings['GASLIMIT'])) -> TxParams:
         """Get generic transaction parameters."""
-
         Uniswap.check_gas(self)
-
         return {
             "from": _addr_to_str(self.address),
             "value": value,
