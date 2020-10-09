@@ -769,6 +769,14 @@ class Uniswap:
             print("Print TX = ", self.w3.toHex(self.w3.keccak(signed_txn.rawTransaction)))
             logger.debug(f"nonce: {tx_params['nonce']}")
             self.last_nonce = Nonce(tx_params["nonce"] + 1)
+            #LOGG TX TO JSON
+            with open('transactions.json', 'r') as fp:
+                data = json.load(fp)
+            tx_input = tx_params
+            data.append(tx_input)
+            with open('transactions.json', 'w') as fp:
+                json.dump(data, fp, indent=2)
+            fp.close()
 
     def check_gas(self):
         try:
