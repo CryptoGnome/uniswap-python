@@ -798,7 +798,7 @@ class Uniswap:
 
 
 
-    def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(float(settings['GASLIMIT'])) -> TxParams:
+    def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(float(settings['GASLIMIT']))) -> TxParams:
         """Get generic transaction parameters."""
         Uniswap.check_gas(self)
         return {
