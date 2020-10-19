@@ -777,6 +777,17 @@ class Uniswap:
             with open('transactions.json', 'w') as fp:
                 json.dump(data, fp, indent=2)
             fp.close()
+            last_tx = self.w3.toHex(self.w3.keccak(signed_txn.rawTransaction))
+            print("Waiting for TX to Confirm")
+            while True:
+                try:
+                    if self.w3.eth.getTransactionReceipt(last_tx) != None:
+                        print("Transaction Confirmed!")
+                        break
+                    else:
+                        print("waiting for tx to confirm")
+                except Exception:
+                    pass
 
     def check_gas(self):
         try:
