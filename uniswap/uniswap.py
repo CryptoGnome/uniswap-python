@@ -778,6 +778,12 @@ class Uniswap:
                 json.dump(data, fp, indent=2)
             fp.close()
             last_tx = self.w3.toHex(self.w3.keccak(signed_txn.rawTransaction))
+            
+            hash = [{'hash':  last_tx}]
+            with open('hash.json', 'w') as fp:
+                json.dump(hash, fp, indent=2)
+            fp.close()
+            
             print("Waiting for TX to Confirm")
             while True:
                 try:
