@@ -788,7 +788,7 @@ class Uniswap:
                         print("waiting for tx to confirm")
                 except Exception:
                     pass
-                sleep(7)
+                time.sleep(5)
 
     def check_gas(self):
         try:
