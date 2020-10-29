@@ -712,6 +712,43 @@ class Uniswap:
                 ),
             )
 
+
+    def swapExactTokensForETHSupportingFee(
+        self, input_token: AddressLike, qty: int, recipient: Optional[AddressLike]
+    ) -> HexBytes:
+        """Convert tokens to ETH given an input amount with Fee"""
+        # Balance check
+        input_balance = self.get_token_balance(input_token)
+        if qty > input_balance:
+            raise InsufficientBalance(input_balance, qty)
+
+        if self.version == 1:
+            token_funcs = self.exchange_contract(input_token).functions
+            func_params: List[Any] = [qty, 1, self._deadline()]
+            if not recipient:
+                function = token_funcs.tokenToEthSwapInput(*func_params)
+            else:
+                func_params.append(recipient)
+                function = token_funcs.tokenToEthTransferInput(*func_params)
+            return self._build_and_send_tx(function)
+        else:
+            if recipient is None:
+                recipient = self.address
+            amount_out_min = int(
+                (1 - self.max_slippage)
+                * self.get_token_eth_input_price(input_token, qty)
+            )
+            return self._build_and_send_tx(
+                self.router.functions.swapExactTokensForETHSupportingFeeOnTransferTokens(
+                    qty,
+                    amount_out_min,
+                    [input_token, self.get_weth_address()],
+                    recipient,
+                    self._deadline(),
+                ),
+            )
+
+
     # ------ Approval Utils ------------------------------------------------------------
     def approve(self, token: AddressLike, max_approval: Optional[int] = None) -> None:
         """Give an exchange/router max approval of a token."""
