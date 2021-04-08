@@ -834,23 +834,28 @@ class Uniswap:
                 time.sleep(5)
 
     def check_gas(self):
-        try:
-            print("Checking Gas NOW")
-            r = requests.get('https://www.gasnow.org/api/v3/gas/price?utm_source=:LimitSwap').json()
-            gasData = r['data']
-            gas_price = int(gasData['rapid'] / 1000000000)
-            gas_boosted = (gas_price * (float(settings['GASBOOST'])/100)) + gas_price
-            self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
-            print("Current Gas Price =", self.gasPrice/1000000000)
 
-        except Exception:
-            print("API Error Estimating Gas Cost Using Web3")
-            gas = self.w3.eth.gasPrice
-            gas_price = gas / 1000000000
-            gas_boosted = (gas_price * ((float(settings['GASBOOST'])*4)/100)) + gas_price
-            self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
-            print("Current Gas Price =", self.gasPrice/1000000000)
+        if settings['USEBOOST'].lower() == 'true':
+            try:
+                print("Checking GASNOW.ORG Trader Rapid Value to Estimate Boost")
+                r = requests.get('https://www.gasnow.org/api/v3/gas/price?utm_source=:LimitSwap').json()
+                gasData = r['data']
+                gas_price = int(gasData['rapid'] / 1000000000)
+                gas_boosted = (gas_price * (float(settings['GASBOOST'])/100)) + gas_price
+                self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
+                print("Current Gas Price =", self.gasPrice/1000000000)
 
+            except Exception:
+                print("API Error Estimating Gas Cost Using Web3")
+                gas = self.w3.eth.gasPrice
+                gas_price = gas / 1000000000
+                gas_boosted = (gas_price * ((float(settings['GASBOOST'])*4)/100)) + gas_price
+                self.gasPrice = self.w3.toWei(gas_boosted, 'GWEI')
+                print("Current Gas Price =", self.gasPrice/1000000000)
+
+        else:
+            print("Using Custom Gas Price: ", settings['GASPRICE'] )
+            self.gasPrice = self.w3.toWei(settings['GASPRICE'], 'GWEI')
 
 
     def _get_tx_params(self, value: Wei = Wei(0), gas: Wei = Wei(int(settings['GASLIMIT'])))-> TxParams:
